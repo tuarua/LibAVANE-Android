@@ -1,0 +1,6 @@
+[submodule "dist/boost"]
+	path = dist/boost
+	url = https://github.com/tuarua/Boost-for-Android-Prebuilt
+[submodule "dist/ffmpeg"]
+	path = dist/ffmpeg
+	url = https://github.com/tuarua/FFmpeg-for-Android-Prebuilt
