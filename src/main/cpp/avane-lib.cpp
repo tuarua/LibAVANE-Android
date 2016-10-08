@@ -177,13 +177,11 @@ extern "C" {
         Json::FastWriter fastWriter;
         const char* json_str = fastWriter.write(j).c_str();
         dispatchJniEventAsync(g_ctx.env, g_ctx.jniHelperObj, g_ctx.asyncEventFunc,json_str, "ON_ENCODE_PROGRESS");
-
     }
     void avaneLog(void *ptr, int level, const char *fmt, va_list vl) {
         //TODO
 
         if(logLevel > 0){
-
             static char message[8192];
             const char *module = NULL;
             using namespace std;
@@ -397,14 +395,299 @@ extern "C" {
     }
 
 
-    JNIEXPORT void JNICALL
-    Java_com_tuarua_avane_android_LibAVANE_jni_1getProbeInfo(JNIEnv *env, jobject instance,
-                                                             jstring filename_) {
-        const char *filename = env->GetStringUTFChars(filename_, 0);
+    JNIEXPORT jstring JNICALL
+    Java_com_tuarua_avane_android_LibAVANE_jni_1getProbeInfo(JNIEnv *env, jobject instance) {
+        using namespace boost;
+        using namespace std;
 
-        // TODO
+        Json::Value probe;
+        if (probeContext.fmt_ctx) {
 
-        env->ReleaseStringUTFChars(filename_, filename);
+            //streams
+            Json::Value vecVideoStreams;
+            Json::Value vecAudioStreams;
+            Json::Value vecSubtitleStreams;
+
+            int i = 0, j = 0, numVideoStreams = 0, numAudioStreams = 0, numSubtitleStreams = 0, currVideoStream = -1, currAudioStream = -1, currSubtitleStream = -1;
+
+            //count the number of each stream type
+            for (j = 0; j < probeContext.fmt_ctx->nb_streams; j++) {
+                if (selected_streams[j]) {
+                    AVCodecContext *dec_ctx;
+                    AVStream *stream = probeContext.fmt_ctx->streams[j];
+                    if ((dec_ctx = stream->codec)) {
+                        switch (dec_ctx->codec_type) {
+                            case AVMEDIA_TYPE_VIDEO:
+                                numVideoStreams++;
+                                break;
+                            case AVMEDIA_TYPE_AUDIO:
+                                numAudioStreams++;
+                                break;
+                            case AVMEDIA_TYPE_SUBTITLE:
+                                numSubtitleStreams++;
+                                break;
+                            default:
+                                break;
+                        }
+                    }
+                }
+            }
+
+            for (i = 0; i < probeContext.fmt_ctx->nb_streams; i++) {
+                if (selected_streams[i]) {
+                    AVStream *stream = probeContext.fmt_ctx->streams[i];
+                    AVCodecContext *dec_ctx;
+                    const AVCodec *dec;
+                    const AVCodecDescriptor *cd;
+                    const char *s;
+                    AVRational sar, dar;
+
+                    char val_str[128];
+
+                    Json::Value objStream;
+                    if ((dec_ctx = stream->codec)) {
+                        const char *profile = NULL;
+                        dec = dec_ctx->codec;
+
+                        switch (dec_ctx->codec_type) {
+                            case AVMEDIA_TYPE_VIDEO:
+                                currVideoStream++;
+                                break;
+                            case AVMEDIA_TYPE_AUDIO:
+                                currAudioStream++;
+                                break;
+                            case AVMEDIA_TYPE_SUBTITLE:
+                                currSubtitleStream++;
+                                break;
+                            default:
+                                break;
+                        }
+
+                        objStream["index"] = stream->index;
+
+                        if (dec) {
+                            objStream["codecName"] = dec->name;
+                            objStream["codecLongName"] = (dec->long_name) ? dec->long_name : "unknown";
+                        } else if ((cd = avcodec_descriptor_get(stream->codec->codec_id))) {
+                            objStream["codecName"] = cd->name;
+                            objStream["codecLongName"] = (cd->long_name) ? cd->long_name : "unknown";
+                        } else {
+                            objStream["codecName"] = "unknown";
+                            objStream["codecLongName"] = "unknown";
+                        }
+
+
+                        if (dec && (profile = av_get_profile_name(dec, dec_ctx->profile))) {
+                            objStream["profile"] = profile;
+                        }else {
+                            if (dec_ctx->profile != FF_PROFILE_UNKNOWN) {
+                                char profile_num[12];
+                                snprintf(profile_num, sizeof(profile_num), "%d", dec_ctx->profile);
+                                objStream["codecLongName"] = profile_num;
+                            }
+                            else {
+                                objStream["profile"] = "unknown";
+                            }
+                        }
+
+                        s = av_get_media_type_string(dec_ctx->codec_type);
+                        objStream["codecType"] = (s) ? s : "unknown";
+                        objStream["codecTimeBase"] = lexical_cast<string>(dec_ctx->time_base.num) + "/" + lexical_cast<string>(dec_ctx->time_base.den);
+
+
+                        /* AVI/FourCC tag */
+                        av_get_codec_tag_string(val_str, sizeof(val_str), dec_ctx->codec_tag);
+
+                        objStream["codecTagString"] = lexical_cast<string>(val_str);
+                        objStream["codecTag"] = dec_ctx->codec_tag;
+
+                        switch (dec_ctx->codec_type) {
+                            case AVMEDIA_TYPE_VIDEO:
+
+                                objStream["width"] = dec_ctx->width;
+                                objStream["height"] = dec_ctx->height;
+                                objStream["codedWidth"] = dec_ctx->coded_width;
+                                objStream["codedHeight"] = dec_ctx->coded_height;
+                                objStream["hasBframes"] = dec_ctx->has_b_frames;
+
+
+                                sar = av_guess_sample_aspect_ratio(probeContext.fmt_ctx, stream, NULL);
+                                if (sar.den) {
+                                    objStream["sampleAspectRatio"] = lexical_cast<string>(sar.num) + ":" + lexical_cast<string>(sar.den);
+                                    av_reduce(&dar.num, &dar.den, dec_ctx->width  * sar.num, dec_ctx->height * sar.den, 1024 * 1024);
+                                    objStream["displayAspectRatio"] = lexical_cast<string>(dar.num) + ":" + lexical_cast<string>(dar.den);
+                                }
+
+                                s = av_get_pix_fmt_name(dec_ctx->pix_fmt);
+
+                                objStream["pixelFormat"] = (s) ? s : "unknown";
+                                objStream["level"] = dec_ctx->level;
+
+                                if (dec_ctx->color_range != AVCOL_RANGE_UNSPECIFIED)
+                                    objStream["colorRange"] = av_color_range_name(dec_ctx->color_range);
+
+
+                                s = av_get_colorspace_name(dec_ctx->colorspace);
+                                objStream["colorSpace"] = string((s) ? s : "unknown");
+
+                                if (dec_ctx->color_trc != AVCOL_TRC_UNSPECIFIED)
+                                    objStream["colorTransfer"] = av_color_transfer_name(dec_ctx->color_trc);
+                                if (dec_ctx->color_primaries != AVCOL_PRI_UNSPECIFIED)
+                                    objStream["colorPrimaries"] = av_color_primaries_name(dec_ctx->color_primaries);
+                                if (dec_ctx->chroma_sample_location != AVCHROMA_LOC_UNSPECIFIED)
+                                    objStream["chromaLocation"] = av_chroma_location_name(dec_ctx->chroma_sample_location);
+
+                                if (dec_ctx->timecode_frame_start >= 0) {
+                                    char tcbuf[AV_TIMECODE_STR_SIZE];
+                                    av_timecode_make_mpeg_tc_string(tcbuf, dec_ctx->timecode_frame_start);
+                                    objStream["timecode"] = tcbuf;
+                                }else {
+                                    objStream["timecode"] = "N/A";
+                                }
+                                objStream["refs"] = dec_ctx->refs;
+
+                                break;
+
+                            case AVMEDIA_TYPE_AUDIO:
+                                s = av_get_sample_fmt_name(dec_ctx->sample_fmt);
+
+                                objStream["sampleFormat"] = (s) ? s : "unknown";
+                                objStream["sampleRate"] = dec_ctx->sample_rate;
+                                objStream["channels"] = dec_ctx->channels;
+
+                                char channel_layout[128];
+                                av_get_channel_layout_string(channel_layout, sizeof(channel_layout), dec_ctx->channels, dec_ctx->channel_layout);
+                                //av_get_channel_layout
+                                if (dec_ctx->channel_layout)
+                                    objStream["channelLayout"] = channel_layout;
+                                else
+                                    objStream["channelLayout"] = "unknown";
+
+                                objStream["bitsPerSample"] = av_get_bits_per_sample(dec_ctx->codec_id);
+
+                                break;
+
+                            case AVMEDIA_TYPE_SUBTITLE:
+                                if (dec_ctx->width)
+                                    objStream["width"] = dec_ctx->width;
+                                if (dec_ctx->height)
+                                    objStream["height"] = dec_ctx->height;
+                                break;
+                            default:
+                                break;
+
+                        }
+
+                    } else {
+                        objStream["codecType"] = "unknown";
+                    }
+
+                    double v;
+                    int rnded;
+                    if (stream->r_frame_rate.num > 0) {
+                        v = double(stream->r_frame_rate.num) / stream->r_frame_rate.den;
+                        rnded = round(v * 1000);
+                        objStream["realFrameRate"] = double(rnded) / 1000;
+                    }
+
+                    if (stream->avg_frame_rate.num > 0) {
+                        v = double(stream->avg_frame_rate.num) / stream->avg_frame_rate.den;
+                        rnded = round(v * 1000);
+                        objStream["averageFrameRate"] = double(rnded) / 1000;
+                    }
+                    objStream["timeBase"] = lexical_cast<string>(stream->time_base.num) + ":" + lexical_cast<string>(stream->time_base.den);
+                    if (probeContext.fmt_ctx->iformat->flags & AVFMT_SHOW_IDS)
+                        objStream["id"] = (probeContext.fmt_ctx->iformat->flags & AVFMT_SHOW_IDS) ? lexical_cast<string>(stream->id) : "N/A";
+
+                    if (stream->duration > 0) {
+                        v = double(stream->duration) / stream->time_base.den;
+                        rnded = round(v * 1000);
+                        objStream["duration"] = double(rnded)/1000;
+                        objStream["durationTimestamp"] = double(stream->duration);
+                    }
+                    objStream["startPTS"] = double(stream->start_time);
+                    v = double(stream->start_time) *  av_q2d(stream->time_base);
+                    rnded = round(v * 100000);
+
+                    objStream["startTime"] = double(rnded) / 100000;
+                    if (dec_ctx->rc_max_rate > 0)
+                        objStream["maxBitRate"] = double(dec_ctx->rc_max_rate);
+                    if (dec_ctx->bits_per_raw_sample > 0)
+                        objStream["bitsPerRawSample"] = double(dec_ctx->bits_per_raw_sample);
+                    if (stream->nb_frames > 0)
+                        objStream["numFrames"] = double(stream->nb_frames);
+
+                    if (dec_ctx->bit_rate > 0)
+                        objStream["bitRate"] = double(dec_ctx->bit_rate);
+
+                    AVDictionaryEntry *tag = NULL;
+                    Json::Value streamTags;
+                    while ((tag = av_dict_get(stream->metadata, "", tag, AV_DICT_IGNORE_SUFFIX)))
+                        streamTags[tag->key] = tag->value;
+
+                    objStream["tags"] = streamTags;
+
+                    switch (dec_ctx->codec_type) {
+                        case AVMEDIA_TYPE_VIDEO:
+                            vecVideoStreams[currVideoStream] = objStream;
+                            break;
+                        case AVMEDIA_TYPE_AUDIO:
+                            vecAudioStreams[currAudioStream] = objStream;
+                            break;
+                        case AVMEDIA_TYPE_SUBTITLE:
+                            vecSubtitleStreams[currSubtitleStream] = objStream;
+                            break;
+                        default:
+                            break;
+                    }
+
+                }
+            }
+
+
+            if(numVideoStreams > 0)
+                probe["videoStreams"] = vecVideoStreams;
+            if(numAudioStreams > 0)
+                probe["audioStreams"] = vecAudioStreams;
+            if(numSubtitleStreams > 0)
+                probe["subtitleStreams"] = vecSubtitleStreams;
+
+            Json::Value objFormat;
+
+            objFormat["filename"] = probeContext.fmt_ctx->filename;
+            objFormat["numStreams"] = probeContext.fmt_ctx->nb_streams;
+            objFormat["numPrograms"] = probeContext.fmt_ctx->nb_programs;
+
+            objFormat["formatName"] = probeContext.fmt_ctx->iformat->name;
+            if (probeContext.fmt_ctx->iformat->long_name)
+                objFormat["formatLongName"] = probeContext.fmt_ctx->iformat->long_name;
+
+            objFormat["startTime"] = (double(probeContext.fmt_ctx->start_time)) / 1000000;
+            objFormat["duration"] = (double(probeContext.fmt_ctx->duration)) / 1000000;
+
+            int64_t size = probeContext.fmt_ctx->pb ? avio_size(probeContext.fmt_ctx->pb) : -1;
+            objFormat["size"] = int32_t(size);
+
+            objFormat["bitRate"] = int32_t(probeContext.fmt_ctx->bit_rate);
+            objFormat["probeScore"] = av_format_get_probe_score(probeContext.fmt_ctx);
+
+            //Tags
+            AVDictionaryEntry *tag = NULL;
+            int numTags = av_dict_count(probeContext.fmt_ctx->metadata);
+
+            Json::Value formatTags;
+            while ((tag = av_dict_get(probeContext.fmt_ctx->metadata, "", tag, AV_DICT_IGNORE_SUFFIX)))
+                formatTags[tag->key] = tag->value;
+
+            objFormat["tags"] = formatTags;
+            probe["format"] = objFormat;
+
+        }
+
+        Json::FastWriter fastWriter;
+        const char* json_str = fastWriter.write(probe).c_str();
+        return env->NewStringUTF(json_str);
+
     }
 
     JNIEXPORT jstring JNICALL
@@ -1037,6 +1320,7 @@ extern "C" {
 
         ////////////////// ************************ //////////////////
         mutex.unlock();
+        //problems with trace or log info ?
         javaVM->DetachCurrentThread();
 
     }
@@ -1063,7 +1347,9 @@ extern "C" {
     JNIEXPORT void JNICALL
     Java_com_tuarua_avane_android_LibAVANE_jni_1cancelEncode(JNIEnv *env, jobject instance) {
         // TODO
-
+        if(isEncoding)
+            avane_set_cancel_transcode(1);
+        isEncoding = false;
     }
 
     JNIEXPORT void JNICALL

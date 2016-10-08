@@ -17,12 +17,18 @@ import com.tuarua.avane.android.gets.PixelFormat;
 import com.tuarua.avane.android.gets.Protocol;
 import com.tuarua.avane.android.gets.Protocols;
 import com.tuarua.avane.android.gets.SampleFormat;
+import com.tuarua.avane.android.probe.AudioStream;
+import com.tuarua.avane.android.probe.Probe;
+import com.tuarua.avane.android.probe.SubtitleStream;
+import com.tuarua.avane.android.probe.VideoStream;
 
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Iterator;
 
 /**
  * Created by User on 02/10/2016.
@@ -41,9 +47,248 @@ public class LibAVANE {
         jni_triggerProbeInfo(filename);
     }
 
-    public void getProbeInfo(String filename) {
-        jni_getProbeInfo(filename);
-        //extensionContext.call("triggerProbeInfo",filename,playlist);
+    public Probe getProbeInfo() {
+        String json = jni_getProbeInfo();
+        JSONObject jsonProbe;
+        JSONObject jsonFormat;
+        JSONArray videoStreams;
+        JSONArray audioStreams;
+        JSONArray subtitleStreams;
+
+        Probe probe = new Probe();
+        Log.i("probeJSONStr",json);
+
+        try {
+            jsonProbe = new JSONObject(json);
+            jsonFormat = jsonProbe.getJSONObject("format");
+
+            probe.format.bitRate = jsonFormat.getInt("bitRate");
+            probe.format.duration = jsonFormat.getDouble("duration");
+            probe.format.filename = jsonFormat.getString("filename");
+            probe.format.numStreams = jsonFormat.getInt("numStreams");
+            probe.format.numPrograms = jsonFormat.getInt("numPrograms");
+            probe.format.formatName = jsonFormat.getString("formatName");
+            probe.format.formatLongName = jsonFormat.getString("formatLongName");
+            probe.format.startTime = jsonFormat.getDouble("startTime");
+            probe.format.size = jsonFormat.getInt("size");
+            probe.format.probeScore = jsonFormat.getInt("probeScore");
+
+            JSONObject jsonTags = jsonFormat.getJSONObject("tags");
+            Iterator<String> iter = jsonTags.keys();
+            while (iter.hasNext()) {
+                String key = iter.next();
+                try {
+                    Object value = jsonTags.get(key);
+                    probe.format.tags.put(key, (String) value);
+                } catch (JSONException e) {
+                    e.printStackTrace();
+                }
+            }
+
+            if(jsonProbe.has("videoStreams")){
+                videoStreams = jsonProbe.getJSONArray("videoStreams");
+                JSONObject jsonStream;
+                VideoStream videoStream = new VideoStream();
+                for(int i=0;i < videoStreams.length();i++) {
+                    jsonStream = videoStreams.getJSONObject(i);
+                    if(jsonStream.has("averageFrameRate"))
+                        videoStream.averageFrameRate = jsonStream.getDouble("averageFrameRate");
+                    if(jsonStream.has("bitRate"))
+                        videoStream.bitRate = jsonStream.getDouble("bitRate");
+                    if(jsonStream.has("bitsPerRawSample"))
+                        videoStream.bitsPerRawSample = jsonStream.getDouble("bitsPerRawSample");
+                    if(jsonStream.has("chromaLocation"))
+                        videoStream.chromaLocation = jsonStream.getString("chromaLocation");
+                    videoStream.codedHeight = jsonStream.getInt("codedHeight");
+                    videoStream.codedWidth = jsonStream.getInt("codedWidth");
+                    if(jsonStream.has("colorPrimaries"))
+                        videoStream.colorPrimaries = jsonStream.getString("colorPrimaries");
+                    if(jsonStream.has("colorRange"))
+                        videoStream.colorRange = jsonStream.getString("colorRange");
+                    if(jsonStream.has("colorSpace"))
+                        videoStream.colorSpace = jsonStream.getString("colorSpace");
+                    if(jsonStream.has("colorTransfer"))
+                        videoStream.colorTransfer = jsonStream.getString("colorTransfer");
+                    videoStream.codecLongName = jsonStream.getString("codecLongName");
+                    videoStream.codecName = jsonStream.getString("codecName");
+                    videoStream.codecTag = jsonStream.getInt("codecTag");
+                    videoStream.codecTagString = jsonStream.getString("codecTagString");
+                    videoStream.codecTimeBase = jsonStream.getString("codecTimeBase");
+                    videoStream.codecType = jsonStream.getString("codecType");
+                    if(jsonStream.has("displayAspectRatio"))
+                        videoStream.displayAspectRatio = jsonStream.getString("displayAspectRatio");
+                    if(jsonStream.has("duration"))
+                        videoStream.duration = jsonStream.getDouble("duration");
+                    if(jsonStream.has("durationTimestamp"))
+                        videoStream.durationTimestamp = jsonStream.getDouble("durationTimestamp");
+                    videoStream.hasBframes = jsonStream.getInt("hasBframes");
+                    videoStream.height = jsonStream.getInt("height");
+                    if(jsonStream.has("id"))
+                        videoStream.id = jsonStream.getString("id");
+                    videoStream.index = jsonStream.getInt("index");
+                    videoStream.level = jsonStream.getInt("level");
+                    if(jsonStream.has("maxBitRate"))
+                        videoStream.maxBitRate = jsonStream.getDouble("maxBitRate");
+                    if(jsonStream.has("numFrames"))
+                        videoStream.numFrames = jsonStream.getDouble("numFrames");
+                    videoStream.pixelFormat = jsonStream.getString("pixelFormat");
+                    videoStream.profile = jsonStream.getString("profile");
+                    if(jsonStream.has("realFrameRate"))
+                        videoStream.realFrameRate = jsonStream.getDouble("realFrameRate");
+                    videoStream.refs = jsonStream.getInt("refs");
+                    if(jsonStream.has("sampleAspectRatio"))
+                        videoStream.sampleAspectRatio = jsonStream.getString("sampleAspectRatio");
+                    videoStream.startPTS = jsonStream.getDouble("startPTS");
+                    videoStream.startTime = jsonStream.getDouble("startTime");
+                    if(jsonFormat.has("tags")) {
+                        JSONObject jsonTagsV = jsonFormat.getJSONObject("tags");
+                        Iterator<String> iter2 = jsonTagsV.keys();
+                        while (iter.hasNext()) {
+                            String key = iter2.next();
+                            try {
+                                Object value = jsonTagsV.get(key);
+                                videoStream.tags.put(key, (String) value);
+                            } catch (JSONException e) {
+                                e.printStackTrace();
+                            }
+                        }
+                    }
+                    videoStream.timecode = jsonStream.getString("timecode");
+                    videoStream.timeBase = jsonStream.getString("timeBase");
+                    videoStream.width = jsonStream.getInt("width");
+
+                    probe.videoStreams.add(videoStream);
+                }
+            }
+
+
+            if(jsonProbe.has("audioStreams")) {
+                audioStreams = jsonProbe.getJSONArray("audioStreams");
+                JSONObject jsonStream;
+                AudioStream audioStream = new AudioStream();
+
+                for(int i=0;i < audioStreams.length();i++) {
+                    jsonStream = audioStreams.getJSONObject(i);
+                    if(jsonStream.has("averageFrameRate"))
+                        audioStream.averageFrameRate = jsonStream.getDouble("averageFrameRate");
+                    if(jsonStream.has("bitRate"))
+                        audioStream.bitRate = jsonStream.getDouble("bitRate");
+                    if(jsonStream.has("bitsPerRawSample"))
+                        audioStream.bitsPerRawSample = jsonStream.getDouble("bitsPerRawSample");
+                    audioStream.codecLongName = jsonStream.getString("codecLongName");
+                    audioStream.codecName = jsonStream.getString("codecName");
+                    audioStream.codecTag = jsonStream.getInt("codecTag");
+                    audioStream.codecTagString = jsonStream.getString("codecTagString");
+                    audioStream.codecTimeBase = jsonStream.getString("codecTimeBase");
+                    audioStream.codecType = jsonStream.getString("codecType");
+
+                    if(jsonStream.has("duration"))
+                        audioStream.duration = jsonStream.getDouble("duration");
+                    if(jsonStream.has("durationTimestamp"))
+                        audioStream.durationTimestamp = jsonStream.getDouble("durationTimestamp");
+
+                    if(jsonStream.has("id"))
+                        audioStream.id = jsonStream.getString("id");
+                    audioStream.index = jsonStream.getInt("index");
+                    if(jsonStream.has("maxBitRate"))
+                        audioStream.maxBitRate = jsonStream.getDouble("maxBitRate");
+                    if(jsonStream.has("numFrames"))
+                        audioStream.numFrames = jsonStream.getDouble("numFrames");
+                    audioStream.profile = jsonStream.getString("profile");
+                    if(jsonStream.has("realFrameRate"))
+                        audioStream.realFrameRate = jsonStream.getDouble("realFrameRate");
+                    audioStream.startPTS = jsonStream.getDouble("startPTS");
+                    audioStream.startTime = jsonStream.getDouble("startTime");
+
+                    if(jsonFormat.has("tags")) {
+                        JSONObject jsonTagsV = jsonFormat.getJSONObject("tags");
+                        Iterator<String> iter2 = jsonTagsV.keys();
+                        while (iter.hasNext()) {
+                            String key = iter2.next();
+                            try {
+                                Object value = jsonTagsV.get(key);
+                                audioStream.tags.put(key, (String) value);
+                            } catch (JSONException e) {
+                                e.printStackTrace();
+                            }
+                        }
+                    }
+                    audioStream.timeBase = jsonStream.getString("timeBase");
+                    audioStream.sampleFormat = jsonStream.getString("sampleFormat");
+                    audioStream.sampleRate = jsonStream.getInt("sampleRate");
+                    audioStream.channels = jsonStream.getInt("channels");
+                    audioStream.channelLayout = jsonStream.getString("channelLayout");
+                    audioStream.bitsPerSample = jsonStream.getInt("bitsPerSample");
+
+                    probe.audioStreams.add(audioStream);
+                }
+            }
+
+            if(jsonProbe.has("subtitleStreams")) {
+                subtitleStreams = jsonProbe.getJSONArray("subtitleStreams");
+                JSONObject jsonStream;
+                SubtitleStream subtitleStream = new SubtitleStream();
+
+                for(int i=0;i < subtitleStreams.length();i++) {
+                    jsonStream = subtitleStreams.getJSONObject(i);
+                    if(jsonStream.has("averageFrameRate"))
+                        subtitleStream.averageFrameRate = jsonStream.getDouble("averageFrameRate");
+                    if(jsonStream.has("bitRate"))
+                        subtitleStream.bitRate = jsonStream.getDouble("bitRate");
+                    if(jsonStream.has("bitsPerRawSample"))
+                        subtitleStream.bitsPerRawSample = jsonStream.getDouble("bitsPerRawSample");
+                    subtitleStream.codecLongName = jsonStream.getString("codecLongName");
+                    subtitleStream.codecName = jsonStream.getString("codecName");
+                    subtitleStream.codecTag = jsonStream.getInt("codecTag");
+                    subtitleStream.codecTagString = jsonStream.getString("codecTagString");
+                    subtitleStream.codecTimeBase = jsonStream.getString("codecTimeBase");
+                    subtitleStream.codecType = jsonStream.getString("codecType");
+
+                    if(jsonStream.has("duration"))
+                        subtitleStream.duration = jsonStream.getDouble("duration");
+                    if(jsonStream.has("durationTimestamp"))
+                        subtitleStream.durationTimestamp = jsonStream.getDouble("durationTimestamp");
+
+                    if(jsonStream.has("id"))
+                        subtitleStream.id = jsonStream.getString("id");
+                    subtitleStream.index = jsonStream.getInt("index");
+                    if(jsonStream.has("maxBitRate"))
+                        subtitleStream.maxBitRate = jsonStream.getDouble("maxBitRate");
+                    if(jsonStream.has("numFrames"))
+                        subtitleStream.numFrames = jsonStream.getDouble("numFrames");
+                    subtitleStream.profile = jsonStream.getString("profile");
+                    if(jsonStream.has("realFrameRate"))
+                        subtitleStream.realFrameRate = jsonStream.getDouble("realFrameRate");
+                    subtitleStream.startPTS = jsonStream.getDouble("startPTS");
+                    subtitleStream.startTime = jsonStream.getDouble("startTime");
+
+                    if(jsonFormat.has("tags")){
+                        JSONObject jsonTagsV = jsonFormat.getJSONObject("tags");
+                        Iterator<String> iter2 = jsonTagsV.keys();
+                        while (iter.hasNext()) {
+                            String key = iter2.next();
+                            try {
+                                Object value = jsonTagsV.get(key);
+                                subtitleStream.tags.put(key, (String) value);
+                            } catch (JSONException e) {
+                                e.printStackTrace();
+                            }
+                        }
+                    }
+
+                    subtitleStream.timeBase = jsonStream.getString("timeBase");
+                    subtitleStream.width = jsonStream.getInt("width");
+                    subtitleStream.height = jsonStream.getInt("height");
+
+                    probe.subtitleStreams.add(subtitleStream);
+                }
+            }
+        } catch (JSONException e) {
+            e.printStackTrace();
+        }
+
+        return probe;
+
     }
 
     public ArrayList<Filter> getFilters(){
@@ -434,7 +679,7 @@ public class LibAVANE {
         //return extensionContext.call("pauseEncode",value);
     }
     private native void jni_triggerProbeInfo(String filename);
-    private native void jni_getProbeInfo(String filename);
+    private native String jni_getProbeInfo();
     private native String jni_getFilters();
     private native String jni_getPixelFormats();
     private native String jni_getLayouts();

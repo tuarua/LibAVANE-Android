@@ -111,7 +111,6 @@ double avane_speed = 2.0; //fast burst start
 int avane_cancel_transcode = 0;
 int avane_pause_transcode = 0;
 int avane_set_cancel_transcode(int arg) {
-	av_log(NULL, AV_LOG_INFO, "ff_set_cancel_transcode set to %d.\n", arg);
 	avane_cancel_transcode = arg;
 	return 1;
 }
@@ -4255,7 +4254,7 @@ static int transcode(void)
 
 			//how can it get here if the while is above
 			if (avane_cancel_transcode) {//eh?/
-				av_log(NULL, AV_LOG_VERBOSE, "user cancelled, finishing.\n");
+				//av_log(NULL, AV_LOG_VERBOSE, "user cancelled, finishing.\n");
 				avane_cancel_transcode = 0;
 				break;
 			}
