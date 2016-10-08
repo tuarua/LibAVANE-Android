@@ -37,12 +37,12 @@ public class LibAVANE {
     private LibAVANE() {
     }
 
-    public void triggerProbeInfo(String filename, String playlist) {
-        jni_triggerProbeInfo(filename, playlist);
+    public void triggerProbeInfo(String filename) {
+        jni_triggerProbeInfo(filename);
     }
 
-    public void getProbeInfo(String filename, String playlist) {
-        jni_getProbeInfo(filename,playlist);
+    public void getProbeInfo(String filename) {
+        jni_getProbeInfo(filename);
         //extensionContext.call("triggerProbeInfo",filename,playlist);
     }
 
@@ -433,8 +433,8 @@ public class LibAVANE {
         return true;
         //return extensionContext.call("pauseEncode",value);
     }
-    private native void jni_triggerProbeInfo(String filename, String playlist);
-    private native void jni_getProbeInfo(String filename, String playlist);
+    private native void jni_triggerProbeInfo(String filename);
+    private native void jni_getProbeInfo(String filename);
     private native String jni_getFilters();
     private native String jni_getPixelFormats();
     private native String jni_getLayouts();

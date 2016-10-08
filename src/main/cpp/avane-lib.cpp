@@ -104,8 +104,13 @@ extern "C" {
         }
     }
 
+    typedef struct {
+        AVFormatContext *fmt_ctx = NULL;
+        std::string fileName;
+        std::string playList = "";
+    }Probe;
+    Probe probeContext;
 
-    // processing callback to handler class
     typedef struct jni_context {
         JavaVM *javaVM;
         JNIEnv *env;
@@ -115,6 +120,9 @@ extern "C" {
     } JniContext;
     JniContext g_ctx;
 
+    static AVInputFormat *iformat = NULL;
+    static char *stream_specifier;
+    static int *selected_streams;
 
 
     jint JNI_OnLoad(JavaVM* vm, void* reserved)  {
@@ -221,32 +229,182 @@ extern "C" {
 
     static int is_device(const AVClass *avclass) {
     if (!avclass) return 0;
-    return AV_IS_INPUT_DEVICE(avclass->category) || AV_IS_OUTPUT_DEVICE(avclass->category);
-}
+        return AV_IS_INPUT_DEVICE(avclass->category) || AV_IS_OUTPUT_DEVICE(avclass->category);
+    }
+
+#define REALLOCZ_ARRAY_STREAM(ptr, cur_n, new_n)                        \
+	{                                                                       \
+		ret = av_reallocp_array(&(ptr), (new_n), sizeof(*(ptr)));           \
+		if (ret < 0)                                                        \
+			goto end;                                                       \
+		memset( (ptr) + (cur_n), 0, ((new_n) - (cur_n)) * sizeof(*(ptr)) ); \
+	}
+
+    //probe input
+    static void closeFileToProbe(AVFormatContext **ctx_ptr) {
+        int i;
+        AVFormatContext *fmt_ctx = *ctx_ptr;
+        /* close decoder for each stream */
+        for (i = 0; i < fmt_ctx->nb_streams; i++)
+            if (fmt_ctx->streams[i]->codec->codec_id != AV_CODEC_ID_NONE)
+                avcodec_close(fmt_ctx->streams[i]->codec);
+        avformat_close_input(ctx_ptr);
+    }
+
+
+    static int probeFile(const char *filename) {
+        probeContext.fmt_ctx = NULL;
+        int ret = 0;
+        int err, i, orig_nb_streams;
+
+        AVDictionaryEntry *t;
+        AVDictionary **opts;
+        av_dict_set(&format_opts, "scan_all_pmts", "1", AV_DICT_DONT_OVERWRITE);
+
+        if ((err = avformat_open_input(&probeContext.fmt_ctx, filename, iformat, &format_opts)) < 0) {
+            trace("Error opening file");
+            return err;
+        }
+
+        av_dict_set(&format_opts, "scan_all_pmts", NULL, AV_DICT_MATCH_CASE);
+
+        // fill the streams in the format context
+        opts = setup_find_stream_info_opts(probeContext.fmt_ctx, codec_opts);
+        orig_nb_streams = probeContext.fmt_ctx->nb_streams;
+        err = avformat_find_stream_info(probeContext.fmt_ctx, opts);
+
+        for (i = 0; i < orig_nb_streams; i++)
+            av_dict_free(&opts[i]);
+
+        av_freep(&opts);
+
+        if (err < 0) {
+            trace("Error finding stream info");
+            return err;
+        }
+
+        for (i = 0; i < probeContext.fmt_ctx->nb_streams; i++) {
+            AVStream *stream = probeContext.fmt_ctx->streams[i];
+            AVCodec *codec;
+
+            if (stream->codecpar->codec_id == AV_CODEC_ID_PROBE) {
+                trace("Failed to probe codec for input stream");
+            }
+            else if (!(codec = avcodec_find_decoder(stream->codecpar->codec_id))) {
+                trace("Unsupported codec with id %d for input stream");
+            }
+            else {
+                AVDictionary *opts = filter_codec_opts(codec_opts, stream->codecpar->codec_id, probeContext.fmt_ctx, stream, codec);
+                if (avcodec_open2(stream->codec, codec, &opts) < 0) {
+                    trace("Could not open codec for input stream");
+                }
+                if ((t = av_dict_get(opts, "", NULL, AV_DICT_IGNORE_SUFFIX))) {
+                    trace("Option for input stream not found");
+                    return AVERROR_OPTION_NOT_FOUND;
+                }
+            }
+        }
+
+#define CHECK_END if (ret < 0) goto end
+        CHECK_END;
+
+        REALLOCZ_ARRAY_STREAM(selected_streams, 0, probeContext.fmt_ctx->nb_streams);
+
+
+        for (i = 0; i < probeContext.fmt_ctx->nb_streams; i++) {
+            if (stream_specifier) {
+                ret = avformat_match_stream_specifier(probeContext.fmt_ctx, probeContext.fmt_ctx->streams[i], stream_specifier);
+                CHECK_END;
+                else
+                    selected_streams[i] = ret;
+                ret = 0;
+            }
+            else {
+                selected_streams[i] = 1;
+            }
+        }
+
+        end:
+        if(ret < 0) {
+            closeFileToProbe(&probeContext.fmt_ctx);
+            av_freep(&selected_streams);
+        }
+        return ret;
+    }
+    void threadProbe(int p) {
+        boost::mutex mutex;
+        using boost::this_thread::get_id;
+
+
+        JavaVM *javaVM = g_ctx.javaVM;
+        JNIEnv *env;
+        jint res = javaVM->GetEnv((void**)&env, JNI_VERSION_1_6);
+        if (res != JNI_OK) {
+            res = javaVM->AttachCurrentThread(&env, NULL);
+            if (JNI_OK != res) {
+
+                std::cout << "Thread attach failed" << std::endl;
+            } else{
+                g_ctx.env = env;
+                g_ctx.asyncEventFunc = env->GetMethodID(g_ctx.jniHelperClz, "dispatchStatusEventAsync", "(Ljava/lang/String;Ljava/lang/String;)V");
+            }
+        }
+
+
+        mutex.lock();
+        ////////////////// ************************ //////////////////
+
+        av_log_set_flags(AV_LOG_SKIP_REPEATED);
+        av_register_all();
+        avformat_network_init();
+        init_opts();
+    #if CONFIG_AVDEVICE
+        avdevice_register_all();
+    #endif
+
+
+        int ret;
+        ret = probeFile(probeContext.fileName.c_str());
+        uninit_opts();
+
+        avformat_network_deinit();
+
+        std::string returnVal = "";
+        dispatchJniEventAsync(g_ctx.env, g_ctx.jniHelperObj, g_ctx.asyncEventFunc,returnVal.c_str(), (ret == 0) ? "ON_PROBE_INFO_AVAILABLE" : "NO_PROBE_INFO");
+        //FREDispatchStatusEventAsync(dllContext, (uint8_t*)returnVal.c_str(), (ret == 0) ? (const uint8_t*)"ON_PROBE_INFO" : (const uint8_t*)"NO_PROBE_INFO");
+
+        ////////////////// ************************ //////////////////
+        mutex.unlock();
+        javaVM->DetachCurrentThread();
+    }
 
     JNIEXPORT void JNICALL
     Java_com_tuarua_avane_android_LibAVANE_jni_1triggerProbeInfo(JNIEnv *env, jobject instance,
-                                                                 jstring filename_, jstring playlist_) {
+                                                                 jstring filename_) {
+        using namespace std;
         const char *filename = env->GetStringUTFChars(filename_, 0);
-        const char *playlist = env->GetStringUTFChars(playlist_, 0);
 
         // TODO
+        probeContext.fileName = string(filename);
+
+       // trace(probeContext.fileName);
 
         env->ReleaseStringUTFChars(filename_, filename);
-        env->ReleaseStringUTFChars(playlist_, playlist);
+
+        threads[0] = boost::move(createThread(&threadProbe, 1));
+        //trace(probeContext.fileName);
+
     }
 
 
     JNIEXPORT void JNICALL
     Java_com_tuarua_avane_android_LibAVANE_jni_1getProbeInfo(JNIEnv *env, jobject instance,
-                                                             jstring filename_, jstring playlist_) {
+                                                             jstring filename_) {
         const char *filename = env->GetStringUTFChars(filename_, 0);
-        const char *playlist = env->GetStringUTFChars(playlist_, 0);
 
         // TODO
 
         env->ReleaseStringUTFChars(filename_, filename);
-        env->ReleaseStringUTFChars(playlist_, playlist);
     }
 
     JNIEXPORT jstring JNICALL

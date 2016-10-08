@@ -40,6 +40,9 @@ public class JniEventDispatcher extends EventDispatcher {
             case Event.ON_PROBE_INFO:
                 event = new Event(Event.ON_PROBE_INFO,msg);
                 break;
+            case Event.ON_PROBE_INFO_AVAILABLE:
+                event = new Event(Event.ON_PROBE_INFO_AVAILABLE,msg);
+                break;
             case Event.NO_PROBE_INFO:
                 event = new Event(Event.NO_PROBE_INFO,msg);
                 break;
