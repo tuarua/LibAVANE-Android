@@ -118,7 +118,6 @@ int avane_get_cancel_transcode() {
 	return avane_cancel_transcode;
 }
 int avane_set_pause_transcode(int arg) {
-	av_log(NULL, AV_LOG_INFO, "ff_set_pause_transcode set to %d.\n", arg);
 	avane_pause_transcode = arg;
 	return 1;
 }

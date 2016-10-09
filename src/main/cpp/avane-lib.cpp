@@ -179,7 +179,7 @@ extern "C" {
         dispatchJniEventAsync(g_ctx.env, g_ctx.jniHelperObj, g_ctx.asyncEventFunc,json_str, "ON_ENCODE_PROGRESS");
     }
     void avaneLog(void *ptr, int level, const char *fmt, va_list vl) {
-        //TODO
+
 
         if(logLevel > 0){
             static char message[8192];
@@ -206,7 +206,7 @@ extern "C" {
 
             logStr = " [ffmpeg][" + (module ? string(module) : "") + "][" + lexical_cast<string>(get_level_str(level)) + "] : " + messageTrimmed;
 
-
+            //TODO
             //logHtml = " <p class=\"" + lexical_cast<string>(get_level_str(level)) + "\">" + (module ? string(module) + ":": "") + lexical_cast<string>(get_level_str(level)) + ": " + messageTrimmed + "</p>";
 
             if (level <= logLevel && !messageTrimmed.empty()) {
@@ -340,8 +340,7 @@ extern "C" {
         if (res != JNI_OK) {
             res = javaVM->AttachCurrentThread(&env, NULL);
             if (JNI_OK != res) {
-
-                std::cout << "Thread attach failed" << std::endl;
+                return;
             } else{
                 g_ctx.env = env;
                 g_ctx.asyncEventFunc = env->GetMethodID(g_ctx.jniHelperClz, "dispatchStatusEventAsync", "(Ljava/lang/String;Ljava/lang/String;)V");
@@ -360,7 +359,6 @@ extern "C" {
         avdevice_register_all();
     #endif
 
-
         int ret;
         ret = probeFile(probeContext.fileName.c_str());
         uninit_opts();
@@ -369,7 +367,6 @@ extern "C" {
 
         std::string returnVal = "";
         dispatchJniEventAsync(g_ctx.env, g_ctx.jniHelperObj, g_ctx.asyncEventFunc,returnVal.c_str(), (ret == 0) ? "ON_PROBE_INFO_AVAILABLE" : "NO_PROBE_INFO");
-        //FREDispatchStatusEventAsync(dllContext, (uint8_t*)returnVal.c_str(), (ret == 0) ? (const uint8_t*)"ON_PROBE_INFO" : (const uint8_t*)"NO_PROBE_INFO");
 
         ////////////////// ************************ //////////////////
         mutex.unlock();
@@ -382,16 +379,9 @@ extern "C" {
         using namespace std;
         const char *filename = env->GetStringUTFChars(filename_, 0);
 
-        // TODO
         probeContext.fileName = string(filename);
-
-       // trace(probeContext.fileName);
-
         env->ReleaseStringUTFChars(filename_, filename);
-
         threads[0] = boost::move(createThread(&threadProbe, 1));
-        //trace(probeContext.fileName);
-
     }
 
 
@@ -1268,7 +1258,7 @@ extern "C" {
         if (res != JNI_OK) {
             res = javaVM->AttachCurrentThread(&env, NULL);
             if (JNI_OK != res) {
-                //cout << "Thread attach failed" << endl;
+                return;
             } else{
                 g_ctx.env = env;
                 g_ctx.asyncEventFunc = env->GetMethodID(g_ctx.jniHelperClz, "dispatchStatusEventAsync", "(Ljava/lang/String;Ljava/lang/String;)V");
@@ -1329,7 +1319,6 @@ extern "C" {
     JNIEXPORT void JNICALL
     Java_com_tuarua_avane_android_LibAVANE_jni_1encode(JNIEnv *env, jobject instance,
                                                        jobjectArray stringArray) {
-        // TODO
         using namespace std;
         int stringCount = env->GetArrayLength(stringArray);
         for (int i=0; i<stringCount; i++) {
@@ -1354,10 +1343,8 @@ extern "C" {
 
     JNIEXPORT void JNICALL
     Java_com_tuarua_avane_android_LibAVANE_jni_1pauseEncode(JNIEnv *env, jobject instance,
-                                                            jobject value) {
-
-        // TODO
-
+                                                            jboolean value) {
+        avane_set_pause_transcode((value) ? 1 : 0);
     }
 
     JNIEXPORT jstring JNICALL
