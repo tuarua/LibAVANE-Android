@@ -8,14 +8,14 @@ import java.util.HashMap;
 
 public class Format {
     public String filename;
-    public int numStreams;
-    public int numPrograms;
+    public int numStreams = 0;
+    public int numPrograms = 0;
     public String formatName;
     public String formatLongName;
-    public Double startTime;
-    public Double duration;
-    public int size; //bytes
-    public int bitRate;
-    public int probeScore;
+    public Double startTime = 0.0;
+    public Double duration = 0.0;
+    public int size = 0; //bytes
+    public int bitRate = 0;
+    public int probeScore = 0;
     public HashMap<String,String> tags = new HashMap<>();//hasmap ?
 }

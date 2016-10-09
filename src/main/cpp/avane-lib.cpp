@@ -1130,7 +1130,7 @@ extern "C" {
             string str = string(av_get_sample_fmt_string(fmt_str, sizeof(fmt_str), (AVSampleFormat)i));
             split(partsList, str, boost::is_any_of(" "));
 
-            if (partsList.at(0) == "n") continue;
+            if (partsList.at(0) == "name") continue;
             cnt++;
             objFormat["n"] = partsList.at(0);
             for (std::vector<string>::const_iterator p = partsList.begin(); p != partsList.end(); ++p) {

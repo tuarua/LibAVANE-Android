@@ -6,8 +6,8 @@ package com.tuarua.avane.android.probe;
 
 public class AudioStream extends Stream {
     public String sampleFormat;
-    public int sampleRate;
-    public int channels;
+    public int sampleRate = 0;
+    public int channels = 0;
     public String channelLayout;
-    public int bitsPerSample;
+    public int bitsPerSample = 0;
 }
