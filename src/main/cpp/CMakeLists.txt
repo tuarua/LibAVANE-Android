@@ -11,7 +11,8 @@ file(MAKE_DIRECTORY ${lib_build_DIR})
 # configure import libs
 set(dist_DIR ${CMAKE_SOURCE_DIR}/../../../dist)
 
-set(ffmpeg_DIR ${CMAKE_SOURCE_DIR}/${ANDROID_ABI}/ffmpeg)
+set(ffmpeg_CONFIG_DIR ${CMAKE_SOURCE_DIR}/${ANDROID_ABI}/ffmpeg)
+set(ffmpeg_DIR ${CMAKE_SOURCE_DIR}/ffmpeg)
 
 add_library(libboost_thread STATIC IMPORTED )
 set_target_properties(libboost_thread PROPERTIES IMPORTED_LOCATION
@@ -27,6 +28,7 @@ set_target_properties(lib_ffmpeg PROPERTIES IMPORTED_LOCATION
 
 
 include_directories(
+    ${ffmpeg_CONFIG_DIR}
     ${ffmpeg_DIR}
     ${dist_DIR}/ffmpeg/include/${ANDROID_ABI}
     ${dist_DIR}/boost/boost_1_53_0/include

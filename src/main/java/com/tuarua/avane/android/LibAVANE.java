@@ -29,6 +29,7 @@ import org.json.JSONObject;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.List;
 
 /**
  * Created by User on 02/10/2016.
@@ -42,6 +43,29 @@ public class LibAVANE {
 
     private LibAVANE() {
     }
+
+    public String[] cliParse(String str, Boolean lookForQuotes) {
+        String[] args;
+        List<String> argsList = new ArrayList<String>();
+        Boolean readingPart = false;
+        String part = "";
+        for (int i = 0; i < str.length(); i++) {
+            String s = String.valueOf(str.charAt(i));
+            if (s.equals(" ") && !readingPart){
+                argsList.add(part);
+                part = "";
+            }else{
+                if(s.equals("\\") && lookForQuotes)
+                    readingPart = !readingPart;
+                else
+                    part +=s ;
+            }
+        }
+        argsList.add(part);
+        args = argsList.toArray(new String[argsList.size()]);
+        return args;
+    }
+
 
     public void triggerProbeInfo(String filename) {
         jni_triggerProbeInfo(filename);
