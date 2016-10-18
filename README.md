@@ -17,8 +17,27 @@ libAVANE.eventDispatcher.addEventListener(Event.ON_ENCODE_PROGRESS, new IEventHa
 	}
 });
 
-String[] params = {"-i","http://download.blender.org/durian/trailer/sintel_trailer-1080p.mp4", "-c:v","libx264","-c:a","copy","-preset","ultrafast","-y", appDirectory + "/files/avane-encode-classic.mp4"};
+String params = "-i " +
+"http://download.blender.org/durian/trailer/sintel_trailer-1080p.mp4 " +
+"-c:v libx264 -crf 22 -c:a copy -preset ultrafast -y "
++ appDirectory + "/files/avane-encode-classic.mp4";
+
 libAVANE.encode(params);
+
+```
+
+Includes ability to probe file for information
+
+```java
+libAVANE.triggerProbeInfo("http://download.blender.org/durian/trailer/sintel_trailer-1080p.mp4");
+
+libAVANE.eventDispatcher.addEventListener(Event.ON_PROBE_INFO_AVAILABLE, new IEventHandler() {
+    @Override
+    public void callback(Event event) {
+        Probe probe = libAVANE.getProbeInfo();
+        duration = probe.format.duration;
+    }
+});
 
 ```
 
