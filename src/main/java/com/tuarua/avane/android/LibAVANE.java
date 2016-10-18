@@ -44,7 +44,7 @@ public class LibAVANE {
     private LibAVANE() {
     }
 
-    public String[] cliParse(String str, Boolean lookForQuotes) {
+    private String[] cliParse(String str, Boolean lookForQuotes) {
         String[] args;
         List<String> argsList = new ArrayList<String>();
         Boolean readingPart = false;
@@ -701,6 +701,9 @@ public class LibAVANE {
 
     public void encode(String[] path) {
         jni_encode(path);
+    }
+    public void encode(String path) {
+        jni_encode(cliParse(path,true));
     }
 
     public void setLogLevel(int level) {
