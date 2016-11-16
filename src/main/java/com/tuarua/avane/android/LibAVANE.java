@@ -2,34 +2,41 @@ package com.tuarua.avane.android;
 
 import android.util.Log;
 
-import com.tuarua.avane.android.gets.AvailableFormat;
-import com.tuarua.avane.android.gets.BitStreamFilter;
-import com.tuarua.avane.android.gets.Codec;
-import com.tuarua.avane.android.gets.Color;
-import com.tuarua.avane.android.gets.Decoder;
-import com.tuarua.avane.android.gets.Device;
-import com.tuarua.avane.android.gets.Encoder;
-import com.tuarua.avane.android.gets.Filter;
-import com.tuarua.avane.android.gets.HardwareAcceleration;
-import com.tuarua.avane.android.gets.Layout;
-import com.tuarua.avane.android.gets.Layouts;
-import com.tuarua.avane.android.gets.PixelFormat;
-import com.tuarua.avane.android.gets.Protocol;
-import com.tuarua.avane.android.gets.Protocols;
-import com.tuarua.avane.android.gets.SampleFormat;
-import com.tuarua.avane.android.probe.AudioStream;
-import com.tuarua.avane.android.probe.Probe;
-import com.tuarua.avane.android.probe.SubtitleStream;
-import com.tuarua.avane.android.probe.VideoStream;
+import com.tuarua.avane.android.ffmpeg.Attachment;
+import com.tuarua.avane.android.ffmpeg.GlobalOptions;
+import com.tuarua.avane.android.ffmpeg.InputOptions;
+import com.tuarua.avane.android.ffmpeg.InputStream;
+import com.tuarua.avane.android.ffmpeg.OutputAudioStream;
+import com.tuarua.avane.android.ffmpeg.OutputOptions;
+import com.tuarua.avane.android.ffmpeg.OutputVideoStream;
+import com.tuarua.avane.android.ffmpeg.gets.AvailableFormat;
+import com.tuarua.avane.android.ffmpeg.gets.BitStreamFilter;
+import com.tuarua.avane.android.ffmpeg.gets.Codec;
+import com.tuarua.avane.android.ffmpeg.gets.Color;
+import com.tuarua.avane.android.ffmpeg.gets.Decoder;
+import com.tuarua.avane.android.ffmpeg.gets.Device;
+import com.tuarua.avane.android.ffmpeg.gets.Encoder;
+import com.tuarua.avane.android.ffmpeg.gets.Filter;
+import com.tuarua.avane.android.ffmpeg.gets.HardwareAcceleration;
+import com.tuarua.avane.android.ffmpeg.gets.Layout;
+import com.tuarua.avane.android.ffmpeg.gets.Layouts;
+import com.tuarua.avane.android.ffmpeg.gets.PixelFormat;
+import com.tuarua.avane.android.ffmpeg.gets.Protocol;
+import com.tuarua.avane.android.ffmpeg.gets.Protocols;
+import com.tuarua.avane.android.ffmpeg.gets.SampleFormat;
+import com.tuarua.avane.android.ffprobe.AudioStream;
+import com.tuarua.avane.android.ffprobe.Probe;
+import com.tuarua.avane.android.ffprobe.SubtitleStream;
+import com.tuarua.avane.android.ffprobe.VideoStream;
 
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Created by User on 02/10/2016.
@@ -699,11 +706,275 @@ public class LibAVANE {
         return jni_getBuildConfiguration();
     }
 
-    public void encode(String[] path) {
-        jni_encode(path);
+    public void encode(String[] args) {
+        jni_encode(args);
     }
-    public void encode(String path) {
-        jni_encode(cliParse(path,true));
+    public void encode(String args) {
+        jni_encode(cliParse(args,true));
+    }
+    public void encode(){
+        List<String> args = new ArrayList<String>();
+        args.add("-nostdin");
+        if(GlobalOptions.overwriteOutputFiles)
+            args.add("-y");
+        if(GlobalOptions.ignoreUnknown)
+            args.add("-ignore_unknown");
+        if(GlobalOptions.copyUnknown)
+            args.add("-copy_unknown");
+        if(GlobalOptions.maxErrorRate > 0){
+            args.add("-max_error_rate");
+            args.add(String.valueOf(GlobalOptions.maxErrorRate));
+        }
+        if(GlobalOptions.timeLimit > 0){
+            args.add("-timelimit");
+            args.add(String.valueOf(GlobalOptions.timeLimit));
+        }
+        if(GlobalOptions.vsync != "-1"){
+            args.add("-vsync");
+            args.add(GlobalOptions.vsync);
+        }
+        if(GlobalOptions.fDropThreshold > -1.1){
+            args.add("-frame_drop_threshold");
+            args.add(String.valueOf(GlobalOptions.fDropThreshold));
+        }
+        if(GlobalOptions.copyTs)
+            args.add("-copyts");
+        if(GlobalOptions.startAtZero)
+            args.add("-start_at_zero");
+        if(GlobalOptions.copyTb > -1){
+            args.add("-copytb");
+            args.add(String.valueOf(GlobalOptions.copyTb));
+        }
+
+        InputOptions inputOptions;
+        int l = InputStream.options.size();
+        for (int i=0; i<l; ++i){
+            inputOptions = InputStream.options.get(i);
+            if(inputOptions.threads > 0){
+                args.add("-threads");
+                args.add(String.valueOf(inputOptions.threads));
+            }
+            if(inputOptions.playlist > -1){
+                args.add("-playlist");
+                args.add(String.valueOf(inputOptions.playlist));
+            }
+            if(inputOptions.realtime)
+                args.add("-re");
+            if(OutputOptions.realtime)//custom to avane
+                args.add("-re2");
+            if(inputOptions.startTime > 0){
+                args.add("-ss");
+                args.add(String.valueOf(inputOptions.startTime));
+            }
+            if(inputOptions.format != null){
+                args.add("-f");
+                args.add(inputOptions.format);
+            }
+            if(inputOptions.streamLoop > 0){
+                args.add("-stream_loop");
+                args.add(String.valueOf(inputOptions.streamLoop));
+            }
+            if(inputOptions.duration > 0){
+                args.add("-t");
+                args.add(String.valueOf(inputOptions.duration));
+            }
+            if(inputOptions.frameRate > 0){
+                args.add("-r");
+                args.add(String.valueOf(inputOptions.frameRate));
+            }
+            if(inputOptions.inputTimeOffset > 0){
+                args.add("-itsoffset");
+                args.add(String.valueOf(inputOptions.inputTimeOffset));
+            }
+            if(inputOptions.hardwareAcceleration != null){
+                args.add("-hwaccel");
+                args.add(inputOptions.hardwareAcceleration);
+            }
+
+            args.add("-i");
+            args.add(inputOptions.uri);
+        }
+
+        if(OutputOptions.copyAllAudioStreams){
+            args.add("-map");
+            args.add("0:a");
+            args.add("-c:a");
+            args.add("copy");
+        }else{
+            if(OutputOptions.audioStreams != null){
+                OutputAudioStream aStream;
+                int l2 = OutputOptions.audioStreams.size();
+
+                for (int j=0; j<l2; ++j){
+                    aStream = OutputOptions.audioStreams.get(j);
+                    args.add("-map");
+                    args.add(String.format("0:a:%d", aStream.sourceIndex));
+                    args.add(String.format("-c:a:%d", j));
+                    args.add(aStream.codec);
+                    if(aStream.samplerate > -1){
+                        args.add(String.format("-ar:a:%d", j));
+                        args.add(String.valueOf(aStream.samplerate));
+                    }
+                    if(aStream.bitrate > -1){
+                        args.add(String.format("-ab:a:%d", j));
+                        args.add(String.valueOf(aStream.bitrate));
+                    }
+                    if(aStream.frames > -1){
+                        args.add(String.format("-frames:a:%d", j));
+                        args.add(String.valueOf(aStream.frames));
+                    }
+
+                    args.add("-ac");
+                    args.add(String.valueOf(aStream.channels));
+                }
+            }
+        }
+
+
+        if(OutputOptions.copyAllVideoStreams){
+            args.add("-map");
+            args.add("0:v");
+            args.add("-c:v");
+            args.add("copy");
+        }else{
+            if(OutputOptions.videoStreams != null){
+                OutputVideoStream vStream;
+                int l3 = OutputOptions.videoStreams.size();
+                for (int k=0; k<l3; ++k){
+                    vStream = OutputOptions.videoStreams.get(k);
+                    args.add("-map");
+                    args.add("0:v:" + vStream.sourceIndex);
+                    args.add("-c:v:" + k);
+                    args.add(vStream.codec);
+
+                    if(vStream.bitrate > -1){
+                        args.add("-b:v:" + k);
+                        args.add(String.valueOf(vStream.bitrate));
+                    }
+
+                    if(vStream.frames > -1){
+                        args.add("-frames:v:" + k);
+                        args.add(String.valueOf(vStream.frames));
+                    }
+
+                    if(vStream.pixelFormat != null){
+                        args.add("-pix_fmt:v:" + k);
+                        args.add(vStream.pixelFormat);
+                    }
+
+                    if(vStream.encoderOptions != null){
+                        Map<String, String> vec = vStream.encoderOptions.getAsMap();
+                        for (Map.Entry<String, String> entry : vec.entrySet()){
+                            args.add(String.format("-%s:v:%d", entry.getKey(), vStream.sourceIndex));
+                            args.add(entry.getValue());
+                        }
+                    }
+
+                    if(vStream.crf > -1){
+                        args.add("-crf");
+                        args.add(String.valueOf(vStream.crf));
+                    }
+
+                    if(vStream.qp > -1){
+                        args.add("-qp");
+                        args.add(String.valueOf(vStream.qp));
+                    }
+
+                    if(vStream.advancedEncOpts != null && vStream.advancedEncOpts.getAsString() != null){
+                        args.add("-" + vStream.advancedEncOpts.type);
+                        args.add("\""+vStream.advancedEncOpts.getAsString()+"\"");
+                    }
+
+                }
+            }
+            if(OutputOptions.videoFilters != null && OutputOptions.videoFilters.size() > 0){
+                args.add("-vf");
+                args.add(OutputOptions.videoFilters.toArray(new String[OutputOptions.videoFilters.size()]).toString());
+            }
+
+
+            if(OutputOptions.bitStreamFilters != null && OutputOptions.bitStreamFilters.size() > 0){
+                for (com.tuarua.avane.android.ffmpeg.BitStreamFilter bsf : OutputOptions.bitStreamFilters) {
+                    args.add("-bsf:"+bsf.type);
+                    args.add(bsf.value);
+                }
+            }
+
+            if(OutputOptions.complexFilters != null && OutputOptions.complexFilters.size() > 0){
+                args.add("-filter_complex");
+                args.add(OutputOptions.complexFilters.toArray(new String[OutputOptions.complexFilters.size()]).toString());
+            }
+            if(OutputOptions.format != null){
+                args.add("-f");
+                args.add(OutputOptions.format);
+            }
+            if(OutputOptions.fastStart){
+                args.add("-movflags");
+                args.add("+faststart");
+            }
+            if(OutputOptions.to > -1){
+                args.add("-to");
+                args.add(OutputOptions.to.toString());
+            }
+            if(OutputOptions.duration > -1){
+                args.add("-t");
+                args.add(OutputOptions.duration.toString());
+            }
+            if(OutputOptions.bufferSize > -1){
+                args.add("-bufsize");
+                args.add(String.valueOf(OutputOptions.bufferSize));
+            }
+            if(OutputOptions.maxRate > -1){
+                args.add("-maxrate");
+                args.add(String.valueOf(OutputOptions.maxRate));
+            }
+            if(OutputOptions.fileSizeLimit > -1){
+                args.add("-fs");
+                args.add(String.valueOf(OutputOptions.fileSizeLimit));
+            }
+            if(OutputOptions.frameRate > 0){
+                args.add("-r");
+                args.add(String.valueOf(OutputOptions.frameRate));
+            }
+            if(OutputOptions.preset != null){
+                args.add("-pre");
+                args.add(OutputOptions.preset);
+            }
+            if(OutputOptions.target != null){
+                args.add("-target");
+                args.add(OutputOptions.target);
+            }
+            if(OutputOptions.attachments != null){
+                Attachment attch;
+                int l4 = OutputOptions.attachments.size();
+                for (int m=0; m<l4; ++m){
+                    attch = OutputOptions.attachments.get(m);
+                    args.add("-metadata:s:t" + m);
+                    args.add("mimetype=" + attch.getMimeType());
+                }
+            }
+            if(OutputOptions.metadata != null){
+                ArrayList<String> vecMeta = OutputOptions.metadata.getAsVector();
+                for (String s : vecMeta) {
+                    args.add("-metadata");
+                    args.add(s);
+                }
+            }
+        }
+
+        /*
+        if(OutputOptions.arbitraryOptions){
+            try{
+                var vecArb:Vector.<Object> = OutputOptions.arbitraryOptions.getAsVector();
+                for each(var optArb:Object in vecArb){
+                    args.push("-"+opt.key, opt.value);
+                }
+            }catch(e:Error){}
+        }
+        */
+
+        args.add(OutputOptions.uri);
+        encode(args.toArray(new String[args.size()]));
     }
 
     public void setLogLevel(int level) {
