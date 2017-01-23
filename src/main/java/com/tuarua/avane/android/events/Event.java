@@ -11,6 +11,7 @@ public class Event {
     public static final String ON_ENCODE_ERROR = "ON_ENCODE_ERROR";
     public static final String ON_ERROR_MESSAGE = "Encode.ERROR_MESSAGE";
     public static final String ON_ENCODE_PROGRESS = "ON_ENCODE_PROGRESS";
+    public static final String ON_ENCODE_FATAL = "ON_ENCODE_FATAL";
 
     protected String strType = "";
     protected Object params;

@@ -1321,6 +1321,7 @@ extern "C" {
                                                        jobjectArray stringArray) {
         using namespace std;
         int stringCount = env->GetArrayLength(stringArray);
+        inputContext.commandLine.clear();
         for (int i=0; i<stringCount; i++) {
             jstring str = (jstring) (env->GetObjectArrayElement(stringArray, i));
             const char *rawString = env->GetStringUTFChars(str, 0);
